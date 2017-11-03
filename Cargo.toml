@@ -1,0 +1,11 @@
+[package]
+name = "vmi"
+version = "0.1.0"
+authors = ["Mark Mansi <markm@cs.wisc.edu>"]
+build = "build.rs"
+
+[build-dependencies]
+bindgen = "0.31"
+
+[dependencies]
+libc = "0.2.33"
