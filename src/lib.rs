@@ -49,7 +49,7 @@ impl VmiInstance {
         }
     }
 
-    pub fn vmi_get_offset(&mut self, offset_name: &str) -> Result<addr_t, ()> {
+    pub fn vmi_get_offset(&mut self, offset_name: &str) -> Result<addr_t, String> {
         unsafe {
             let mut offset: addr_t = 0u64;
 
@@ -59,17 +59,20 @@ impl VmiInstance {
                 &mut offset as *mut _,
             ) == status_VMI_FAILURE
             {
-                Err(())
+                Err(format!(
+                    "Unable to get offset \"{}\" from config",
+                    offset_name
+                ))
             } else {
                 Ok(offset)
             }
         }
     }
 
-    pub fn vmi_pause_vm(&mut self) -> Result<(), ()> {
+    pub fn vmi_pause_vm(&mut self) -> Result<(), String> {
         unsafe {
             if vmi_pause_vm(self.vmi) == status_VMI_FAILURE {
-                Err(())
+                Err("Unable to pause vm".into())
             } else {
                 self.paused = true;
                 Ok(())
@@ -77,10 +80,10 @@ impl VmiInstance {
         }
     }
 
-    pub fn vmi_resume_vm(&mut self) -> Result<(), ()> {
+    pub fn vmi_resume_vm(&mut self) -> Result<(), String> {
         unsafe {
             if vmi_resume_vm(self.vmi) == status_VMI_FAILURE {
-                Err(())
+                Err("Unable to resume vm".into())
             } else {
                 self.paused = false;
                 Ok(())
@@ -88,7 +91,7 @@ impl VmiInstance {
         }
     }
 
-    pub fn vmi_translate_ksym2v(&mut self, name: &str) -> Result<addr_t, ()> {
+    pub fn vmi_translate_ksym2v(&mut self, name: &str) -> Result<addr_t, String> {
         unsafe {
             let mut addr: addr_t = uninitialized();
 
@@ -98,45 +101,76 @@ impl VmiInstance {
                 &mut addr as *mut _,
             ) == status_VMI_FAILURE
             {
-                Err(())
+                Err(format!(
+                    "Unable to translate kernel symbol \"{}\" to va",
+                    name
+                ))
             } else {
                 Ok(addr)
             }
         }
     }
 
-    pub fn vmi_read_addr_va(&mut self, vaddr: addr_t, pid: i32) -> Result<addr_t, ()> {
+    pub fn vmi_read_addr_va(&mut self, vaddr: addr_t, pid: i32) -> Result<addr_t, String> {
         unsafe {
             let mut addr: addr_t = uninitialized();
 
             if vmi_read_addr_va(self.vmi, vaddr, pid as _, &mut addr as *mut _) ==
                 status_VMI_FAILURE
             {
-                Err(())
+                Err(format!(
+                    "Unable to read addr from address 0x{:X} for PID {}",
+                    vaddr,
+                    pid
+                ))
             } else {
                 Ok(addr)
             }
         }
     }
 
-    pub fn vmi_read_32_va(&mut self, vaddr: addr_t, pid: i32) -> Result<u32, ()> {
+    pub fn vmi_read_32_va(&mut self, vaddr: addr_t, pid: i32) -> Result<u32, String> {
         unsafe {
             let mut val: u32 = 0;
 
             if vmi_read_32_va(self.vmi, vaddr, pid as _, &mut val as *mut _) == status_VMI_FAILURE {
-                Err(())
+                Err(format!(
+                    "Unable to read u32 from address 0x{:X} for PID {}",
+                    vaddr,
+                    pid
+                ))
             } else {
                 Ok(val)
             }
         }
     }
 
-    pub fn vmi_read_str_va(&mut self, vaddr: addr_t, pid: i32) -> Result<String, ()> {
+    pub fn vmi_read_64_va(&mut self, vaddr: addr_t, pid: i32) -> Result<u64, String> {
+        unsafe {
+            let mut val: u64 = 0;
+
+            if vmi_read_64_va(self.vmi, vaddr, pid as _, &mut val as *mut _) == status_VMI_FAILURE {
+                Err(format!(
+                    "Unable to read u64 from address 0x{:X} for PID {}",
+                    vaddr,
+                    pid
+                ))
+            } else {
+                Ok(val)
+            }
+        }
+    }
+
+    pub fn vmi_read_str_va(&mut self, vaddr: addr_t, pid: i32) -> Result<String, String> {
         unsafe {
             let s = vmi_read_str_va(self.vmi, vaddr, pid as _);
 
             if s == (null::<i8>() as *mut _) {
-                Err(())
+                Err(format!(
+                    "Unable to read string from address 0x{:X} for PID {}",
+                    vaddr,
+                    pid
+                ))
             } else {
                 // Allocate a normal rust string
                 let c_str = CStr::from_ptr(s).to_string_lossy().into_owned();
@@ -153,8 +187,8 @@ impl VmiInstance {
 impl Drop for VmiInstance {
     fn drop(&mut self) {
         // Unpause the VM if it is paused
-        if let Err(()) = self.vmi_resume_vm() {
-            println!("Unable to resume VM before dropping handle");
+        if let Err(msg) = self.vmi_resume_vm() {
+            println!("Error while dropping VMI handle: {}", msg);
         }
 
         // Destroy the handle
