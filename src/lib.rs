@@ -182,6 +182,75 @@ impl VmiInstance {
             }
         }
     }
+
+    pub fn vmi_read_addr_ksym(&mut self, name: &str) -> Result<addr_t, String> {
+        unsafe {
+            let mut addr: addr_t = uninitialized();
+
+            if vmi_read_addr_ksym(
+                self.vmi,
+                CString::new(name).unwrap().as_ptr() as *mut _,
+                &mut addr as *mut _,
+            ) == status_VMI_FAILURE
+            {
+                Err(format!("Unable to read addr from symbol {}", name))
+            } else {
+                Ok(addr)
+            }
+        }
+    }
+
+    pub fn vmi_read_32_ksym(&mut self, name: &str) -> Result<u32, String> {
+        unsafe {
+            let mut val: u32 = 0;
+
+            if vmi_read_32_ksym(
+                self.vmi,
+                CString::new(name).unwrap().as_ptr() as *mut _,
+                &mut val as *mut _,
+            ) == status_VMI_FAILURE
+            {
+                Err(format!("Unable to read u32 from symbol {}", name))
+            } else {
+                Ok(val)
+            }
+        }
+    }
+
+    pub fn vmi_read_64_ksym(&mut self, name: &str) -> Result<u64, String> {
+        unsafe {
+            let mut val: u64 = 0;
+
+            if vmi_read_64_ksym(
+                self.vmi,
+                CString::new(name).unwrap().as_ptr() as *mut _,
+                &mut val as *mut _,
+            ) == status_VMI_FAILURE
+            {
+                Err(format!("Unable to read u64 from symbol {}", name))
+            } else {
+                Ok(val)
+            }
+        }
+    }
+
+    pub fn vmi_read_str_ksym(&mut self, name: &str) -> Result<String, String> {
+        unsafe {
+            let s = vmi_read_str_ksym(self.vmi, CString::new(name).unwrap().as_ptr() as *mut _);
+
+            if s == (null::<i8>() as *mut _) {
+                Err(format!("Unable to read string from symbol {}", name))
+            } else {
+                // Allocate a normal rust string
+                let c_str = CStr::from_ptr(s).to_string_lossy().into_owned();
+
+                // Free the one allocated by libvmi
+                free(s as *mut _);
+
+                Ok(c_str)
+            }
+        }
+    }
 }
 
 impl Drop for VmiInstance {
